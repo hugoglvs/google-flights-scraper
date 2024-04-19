@@ -13,9 +13,9 @@ setup(
     keywords=['google flights scraper', 'google flights', 'flights scraper', 'flights'],
     include_package_data=True,
     install_requires=[
-        'playwright==1.17.0',
-        'selectolax==0.2.12',
-        'click==7.1.2'
+        'playwright>=1.42',
+        'selectolax>=0.3',
+        'click>=8.1'
     ],
     entry_points={
         'console_scripts': [

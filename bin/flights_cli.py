@@ -1,11 +1,11 @@
-#!/Users/hugogoncalves/Developer/google-flights-scraping/.venv/bin/python3.12
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 """CLI Tool for scraping Google Flights using the GoogleFlights class"""
-import sys
+import sys, os
 import click
 from datetime import datetime, timedelta
-sys.path.append('/Users/hugogoncalves/Developer/google-flights-scraping')
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from google_flights.google_flights import GoogleFlights  # Ensure correct import path based on your project structure
 
 # Usage: google_flights_cli.py --help

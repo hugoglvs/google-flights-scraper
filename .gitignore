@@ -1,4 +1,6 @@
 ignore/
+.venv
 run.py
+*.json
 *.
 __pycache__

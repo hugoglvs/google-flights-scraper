@@ -13,7 +13,7 @@ class GoogleFlights:
     def __init__(self, headless=True):
         self.headless = headless
 
-    def _get_page(self, origin, destination, departure_date, passengers=1):
+    def _extract(self, origin, destination, departure_date, passengers=1):
         """
         Navigate to the Google Flights page and input flight search parameters.
 
@@ -97,13 +97,18 @@ class GoogleFlights:
                 # Ensure the browser is closed properly
                 browser.close()
 
-
-
     def _parse(self, page_content):
-        parser = LexborHTMLParser(page_content)
+        return LexborHTMLParser(page_content)
+
+    def _process(self, parser):
         data = {}
-        categories = parser.root.css('.zBTtmb')
-        category_results = parser.root.css('.Rk10dc')
+        # Only get the first category results
+        # The first category is the most relevant one
+        # I had to pust lists so that I can iterate over them
+        # categories = parser.root.css('.zBTtmb')
+        # category_results = parser.root.css('.Rk10dc')
+        categories = [parser.root.css_first('.zBTtmb')]
+        category_results = [parser.root.css_first('.Rk10dc')]
 
         for category, category_result in zip(categories, category_results):
             category_data = []
@@ -111,34 +116,38 @@ class GoogleFlights:
                 main_information = result.css_first('.yR1fYc')
                 if main_information is None:
                     continue  # Skip this iteration if main_information is not found
+                if main_information.css_first('.PTuQse.sSHqwe.tPgKwe.ogfYpf') is None:
+                    continue # Skip this iteration if main_information is not found (-> the trip contains train)
 
-                date = main_information.css('[jscontroller="cNtv4b"] span') if main_information.css('[jscontroller="cNtv4b"] span') else None
-                departure_date = date[0].text() if date else None
-                arrival_date = date[1].text() if date else None
-                company = main_information.css_first('.Ir0Voe .sSHqwe').text() if main_information.css_first('.Ir0Voe .sSHqwe') else None
-                duration = main_information.css_first('.AdWm1c.gvkrdb').text() if main_information.css_first('.AdWm1c.gvkrdb') else None
-                stops = main_information.css_first('.EfT7Ae .ogfYpf').text() if main_information.css_first('.EfT7Ae .ogfYpf') else None
-                emissions = main_information.css_first('.V1iAHe .AdWm1c').text() if main_information.css_first('.V1iAHe .AdWm1c') else None
+                time = main_information.css('[jscontroller="cNtv4b"] span') if main_information.css('[jscontroller="cNtv4b"] span') else None
+                # TO-DO: Make it a datetime readable (DD/MM/YYYY HH:MM)
+                # for now, it's just the time (HH:MM)
+                # if time has +1, it means it's the next day
+                departure_time = time[0].text() if time else None
+                arrival_time = time[1].text() if time else None
+                company = main_information.css_first('.Ir0Voe .sSHqwe').text()
+                duration = main_information.css_first('.AdWm1c.gvkrdb').text()
+                stops = main_information.css_first('.EfT7Ae .ogfYpf').text()
+                emissions = main_information.css_first('.V1iAHe .AdWm1c').text()
                 emission_comparison = main_information.css_first('.N6PNV').text() if main_information.css_first('.N6PNV') else None
-                price = main_information.css_first('.U3gSDe .FpEdX span').text() if main_information.css_first('.U3gSDe .FpEdX span') else 0
+                price = main_information.css_first('.U3gSDe .FpEdX span').text()
                 price_type = main_information.css_first('.U3gSDe .N872Rd').text() if main_information.css_first('.U3gSDe .N872Rd') else None
 
-                extra_information = result.css_first('.m9ravf .xOMPfb.MNvMJb')
-                if extra_information is None:
-                    continue  # Skip this iteration if extra_information is not found
-                trips = extra_information.css(".c257Jb.eWArhb") if extra_information.css(".c257Jb.eWArhb") else None
-                if trips:
-                    departure_airport = trips[0].css_first(".FFbonc .dPzsIb span[dir='ltr']").text()[1:-1]
-                    airports = [departure_airport]
-                    for trip in trips:
-                        intermediate_airports = trip.css_first(".FFbonc .SWFQlc span[dir='ltr']").text()[1:-1] if trip.css_first(".FFbonc .SWFQlc span[dir='ltr']") else None
-                        airports.append(intermediate_airports)
-                else:
-                     airports = None
+                airports = main_information.css_first('.PTuQse.sSHqwe.tPgKwe.ogfYpf').css(".QylvBf")
+                departure_airport = airports[0].text()[:3]
+                arrival_airport = airports[-1].text()[:3]
+                airports = [departure_airport, arrival_airport]
+                if stops != "Sans escale":
+                    stop_airports = main_information.css('.BbR8Ec > .sSHqwe.tPgKwe.ogfYpf > span')
+                    if stop_airports:
+                        temp = []
+                        for stop_airport in stop_airports:
+                            temp.append(stop_airport.text()[:3])
+                        airports[1:1] = temp
 
                 flight_data = {
-                    'departure_date': departure_date,
-                    'arrival_date': arrival_date,
+                    'departure_date': departure_time,
+                    'arrival_date': arrival_time,
                     'company': company,
                     'duration': duration,
                     'stops': stops,
@@ -148,7 +157,6 @@ class GoogleFlights:
                     'price_type': price_type,
                     'airports': airports
                 }
-
 
                 category_data.append(flight_data)
             data[category.text().lower().replace(' ', '_')] = category_data
@@ -167,9 +175,12 @@ class GoogleFlights:
                 Returns:
                     dict: Parsed flight data.
                 """
-        page = self._get_page(origin, destination, departure_date, passengers)
-        results = self._parse(page)
+
+        page = self._extract(origin, destination, departure_date, passengers)
+        parser = self._parse(page)
+        results = self._process(parser)
         return results
+
 
 if __name__ == "__main__":
     flights = GoogleFlights(headless=False)
