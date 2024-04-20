@@ -4,3 +4,6 @@ run.py
 *.json
 *.
 __pycache__
+build
+dist
+*.egg-info
